@@ -1,0 +1,23 @@
+{
+    "name": "alexzv/jira-restapi-client",
+    "type": "library",
+    "description": "A PHP client for Jira REST API 2. Supports both Basic and OAuth authentication.",
+    "keywords": ["jira", "rest", "api", "oauth", "guzzle"],
+    "homepage": "https://github.com/cpliakas/jira-client",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Alex Zet",
+            "email": "zetdev@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.3",
+        "guzzle/guzzle": "3.7.*@dev"
+    },
+    "autoload": {
+        "psr-0": {
+            "Jira": "src/"
+        }
+    }
+}
