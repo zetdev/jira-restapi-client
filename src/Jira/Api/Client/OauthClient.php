@@ -24,33 +24,29 @@ class OauthClient implements ClientInterface
     const METHOD_POST = 'post';
     const DATA_TYPE_JSON = 'json';
     
-    protected $_config;
-    protected $_auth;
-    protected $_client;
+    protected $auth;
+    protected $client;
     
-    protected $_token;
-    protected $_automatic_revalidate_user = true;
+    protected $token;
+    protected $automatic_revalidate_user = false;
     
     public function __construct($config) {
         
-        $this->_config = array(
-            // Required params
-            'callback_url'     => $config['callback_url'],
-            'base_url'         => $config['base_url'],
-            'consumer_key'     => $config['consumer_key'],
-            'consumer_secret'  => $config['consumer_secret'],
-            'private_key'      => $config['private_key'],
-            'public_key'       => $config['public_key'],
-        );
-        
-        $this->_auth = new Oauth($this->config);
+        $this->auth = new Oauth($config['base_url']);
+        $this->auth->setPrivateKey($config['private_key'])
+          ->setConsumerKey($config['consumer_key'])
+          ->setConsumerSecret($config['consumer_secret'])
+          ->setRequestTokenUrl('plugins/servlet/oauth/request-token')
+          ->setAuthorizationUrl('plugins/servlet/oauth/authorize?oauth_token=%s')
+          ->setAccessTokenUrl('plugins/servlet/oauth/access-token')
+          ->setCallbackUrl($config['callback_url']);
     }
 
     public function getToken()
     {
         if (session_status() != 2) { session_start(); }
 
-        if (!$this->_token) {
+        if (empty($this->token)) {
             if (!isset($_SESSION['JIRA_ACCESS_TOKEN']) && isset($_SESSION['JIRA_REQUEST_TOKEN'])) {
                 $this->getAccessToken();
             }
@@ -58,30 +54,31 @@ class OauthClient implements ClientInterface
                 $this->validateOAuthAccess();
             }
 
-            $this->_token = unserialize($_SESSION['JIRA_ACCESS_TOKEN']);
+            $this->token = $_SESSION['JIRA_ACCESS_TOKEN'];
         }
-        return $this->_token;
+        return $this->token;
     }
     
     public function getIssue($issue_id) {
-        $url = $this->_auth->getOption('api_url').'/issue/'.(int)$issue_id;
+        $url = $this->auth->getOption('api_url').'/issue/'.(int)$issue_id;
         
         return $this->sendRequest($url, null, self::METHOD_GET);
     }
 
     public function createIssue(array $params) {
-        $url = $this->_auth->getOption('api_url').'/createissue';
+        $url = $this->auth->getOption('api_url').'/createissue';
         
         return $this->sendRequest($url, $params, self::METHOD_POST);
     }
     
     protected function validateOAuthAccess()
     {
-        $token = $this->_auth->requestTempCredentials();
+        $token = $this->auth->requestTempCredentials();
         
-        $_SESSION['JIRA_REQUEST_TOKEN'] = serialize($token);
+        $_SESSION['JIRA_REQUEST_TOKEN'] = $token;
 
-        $this->redirect($this->_auth->makeAuthUrl());
+        $redirect = $this->auth->makeAuthUrl();
+        $this->redirect($redirect);
     }
     
     protected function getAccessToken($redirect=false)
@@ -94,15 +91,15 @@ class OauthClient implements ClientInterface
 
         if($_SESSION['JIRA_REQUEST_TOKEN'])
         {
-            $tempToken = unserialize($_SESSION['JIRA_REQUEST_TOKEN']);
+            $tempToken = $_SESSION['JIRA_REQUEST_TOKEN'];
 
-            $this->_token = $this->_auth->requestAuthCredentials(
+            $this->token = $this->auth->requestAuthCredentials(
                 $tempToken['oauth_token'],
                 $tempToken['oauth_token_secret'],
                 $verifier
             );
 
-            $_SESSION['JIRA_ACCESS_TOKEN'] = serialize($this->_token);
+            $_SESSION['JIRA_ACCESS_TOKEN'] = $this->token;
         }
         else {
             die('Bad Request Token');
@@ -125,11 +122,11 @@ class OauthClient implements ClientInterface
     {
         $token = $this->getToken();
         
-        $this->_client = $this->_auth->getClient(
+        $this->client = $this->auth->getClient(
                 $token['oauth_token'], 
 			    $token['oauth_token_secret']);
         
-        return $this->_client;
+        return $this->client;
     }
 
     /**
@@ -144,7 +141,7 @@ class OauthClient implements ClientInterface
      */
     protected function sendRequest($url, $data=null, $method=null, $data_type=null)
     {
-        if (!($this->_client instanceof Oauth)) {
+        if (!($this->client instanceof Oauth)) {
             throw new Exception("OauthClient not exists.");
         }
         
@@ -165,10 +162,10 @@ class OauthClient implements ClientInterface
                     $data = json_encode($data);
                 }
                 if ($method == self::METHOD_POST) {
-                    $request = $this->_client->post($uri,
+                    $request = $this->client->post($uri,
                             array('Content-type' => 'application/json'), $data);
                 } else {
-                    $request = $this->_client->get($uri);
+                    $request = $this->client->get($uri);
                 }
         }
         
@@ -177,7 +174,7 @@ class OauthClient implements ClientInterface
             
             if($response->getStatus() == 401)
             {
-                if($this->_automatic_revalidate_user) {
+                if($this->automatic_revalidate_user) {
                     $this->validateOAuthAccess();
                 } else {
                     throw new Exception("Your user session has expired.");
