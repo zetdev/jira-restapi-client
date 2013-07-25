@@ -28,7 +28,15 @@ class OauthClient implements ClientInterface
     protected $client;
     
     protected $token;
-    protected $automatic_revalidate_user = false;
+    protected $automatic_revalidate_user = true;
+
+    protected $request_token_uri = 'plugins/servlet/oauth/request-token';
+    protected $authorization_uri = 'plugins/servlet/oauth/authorize?oauth_token=%s';
+    protected $access_token_uri = 'plugins/servlet/oauth/access-token';
+    protected $rest_api_uri = 'rest/api/2';
+
+    protected $api_url;
+    protected $callback_url;
     
     public function __construct($config) {
         
@@ -36,10 +44,13 @@ class OauthClient implements ClientInterface
         $this->auth->setPrivateKey($config['private_key'])
           ->setConsumerKey($config['consumer_key'])
           ->setConsumerSecret($config['consumer_secret'])
-          ->setRequestTokenUrl('plugins/servlet/oauth/request-token')
-          ->setAuthorizationUrl('plugins/servlet/oauth/authorize?oauth_token=%s')
-          ->setAccessTokenUrl('plugins/servlet/oauth/access-token')
+          ->setRequestTokenUrl($this->request_token_uri)
+          ->setAuthorizationUrl($this->authorization_uri)
+          ->setAccessTokenUrl($this->access_token_uri)
           ->setCallbackUrl($config['callback_url']);
+
+        $this->api_url = $config['base_url'].$this->rest_api_uri;
+        $this->callback_url = $config['callback_url'];
     }
 
     public function getToken()
@@ -54,19 +65,19 @@ class OauthClient implements ClientInterface
                 $this->validateOAuthAccess();
             }
 
-            $this->token = $_SESSION['JIRA_ACCESS_TOKEN'];
+            $this->token = unserialize($_SESSION['JIRA_ACCESS_TOKEN']);
         }
         return $this->token;
     }
     
     public function getIssue($issue_id) {
-        $url = $this->auth->getOption('api_url').'/issue/'.(int)$issue_id;
+        $url = $this->api_url.'/issue/'.$issue_id;
         
         return $this->sendRequest($url, null, self::METHOD_GET);
     }
 
     public function createIssue(array $params) {
-        $url = $this->auth->getOption('api_url').'/createissue';
+        $url = $this->api_url.'/issue/';
         
         return $this->sendRequest($url, $params, self::METHOD_POST);
     }
@@ -75,13 +86,13 @@ class OauthClient implements ClientInterface
     {
         $token = $this->auth->requestTempCredentials();
         
-        $_SESSION['JIRA_REQUEST_TOKEN'] = $token;
+        $_SESSION['JIRA_REQUEST_TOKEN'] = serialize($token);
 
         $redirect = $this->auth->makeAuthUrl();
         $this->redirect($redirect);
     }
     
-    protected function getAccessToken($redirect=false)
+    protected function getAccessToken($redirect=true)
     {
         $verifier = isset($_REQUEST['oauth_verifier']) ? $_REQUEST['oauth_verifier'] : '';
 
@@ -89,27 +100,24 @@ class OauthClient implements ClientInterface
             throw new InvalidArgumentException("There was no oauth verifier in the request");
         }
 
-        if($_SESSION['JIRA_REQUEST_TOKEN'])
+        if (isset($_SESSION['JIRA_REQUEST_TOKEN']))
         {
-            $tempToken = $_SESSION['JIRA_REQUEST_TOKEN'];
+            $tempToken = unserialize($_SESSION['JIRA_REQUEST_TOKEN']);
 
             $this->token = $this->auth->requestAuthCredentials(
                 $tempToken['oauth_token'],
                 $tempToken['oauth_token_secret'],
                 $verifier
             );
-
-            $_SESSION['JIRA_ACCESS_TOKEN'] = $this->token;
+            $_SESSION['JIRA_ACCESS_TOKEN'] = serialize($this->token);
         }
         else {
             die('Bad Request Token');
         }
         
         if ($redirect) {
-            $this->redirect($redirect);
+            $this->redirect($this->callback_url);
         }
-        
-        return isset($_SESSION['JIRA_ACCESS_TOKEN']);
     }
     
     protected function redirect($redirectUrl)
@@ -132,7 +140,7 @@ class OauthClient implements ClientInterface
     /**
      * Send request to the API server
      *
-     * @param string $uri
+     * @param string $url
      * @param mixed $data
      * @param string $data_type
      * @param string $method
@@ -142,7 +150,7 @@ class OauthClient implements ClientInterface
     protected function sendRequest($url, $data=null, $method=null, $data_type=null)
     {
         if (!($this->client instanceof Oauth)) {
-            throw new Exception("OauthClient not exists.");
+            $this->client = $this->getClient();
         }
         
         if (empty($url)) {
@@ -162,17 +170,18 @@ class OauthClient implements ClientInterface
                     $data = json_encode($data);
                 }
                 if ($method == self::METHOD_POST) {
-                    $request = $this->client->post($uri,
+                    $request = $this->client->post($url,
                             array('Content-type' => 'application/json'), $data);
                 } else {
-                    $request = $this->client->get($uri);
+                    $request = $this->client->get($url,
+                            array('Content-type' => 'application/json'));
                 }
         }
         
         if (isset($request)) {
             $response = $request->send();
             
-            if($response->getStatus() == 401)
+            if ($response->getStatusCode() == 401)
             {
                 if($this->automatic_revalidate_user) {
                     $this->validateOAuthAccess();
