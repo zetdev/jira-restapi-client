@@ -21,34 +21,38 @@ class JiraClient
     const AUTH_BASIC = 'basic';
     const AUTH_OAUTH = 'oauth';
     
-    protected $authentication;
-    protected $token;
-    protected $client;
+    protected $_authentication;
+    protected $_token;
+    protected $_client;
 
     public function __construct($config, $auth_type=null) {
-        $this->authentication = $auth_type ? $auth_type : self::AUTH_OAUTH;
+        $this->_authentication = $auth_type ? $auth_type : self::AUTH_BASIC;
 
 
-        switch($this->authentication) {
+        switch($this->_authentication) {
             case self::AUTH_OAUTH :
-                $this->client = new OauthClient($config);
+                $this->_client = new OauthClient($config);
+            break;
+        
+            case self::AUTH_BASIC :
+                $this->_client = new BaseClient($config);
             break;
         }
     }
     
     public function init()
     {
-        if (!$this->token) {
-            $this->token = $this->client->getToken();
+        if (!$this->_token) {
+            $this->_token = $this->_client->getToken();
         }
         
-        return $this->token;
+        return $this->_token;
     }
     
     public function getIssue($issue_id)
     {
         if ($this->init()) {
-            return $this->client->getIssue($issue_id);
+            return $this->_client->getIssue($issue_id);
         } else {
             return false;
         }
@@ -57,7 +61,7 @@ class JiraClient
     public function createIssue(array $params)
     {
         if ($this->init()) {
-            return $this->client->createIssue($params);
+            return $this->_client->createIssue($params);
         } else {
             return false;
         }

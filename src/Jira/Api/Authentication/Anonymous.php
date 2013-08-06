@@ -14,14 +14,34 @@
 
 namespace Jira\Api\Authentication;
 
+use Guzzle\Http\Client;
+
 class Anonymous implements AuthenticationInterface
 {
-    public function __construct()
+    protected $_baseUrl;
+    protected $_userId;
+    protected $_password;
+    protected $_client;
+
+    public function __construct($base_url)
     {
+        $this->_baseUrl = $base_url;
+        $this->_userId  = 'anonymous';
+        $this->_password = 'anonymous';
     }
-    
-    public function getCredential()
+
+    public function getCredentials()
     {
-        return NULL;
+        return array($this->_userId, $this->_password);
+    }
+
+    public function getClient($token = false, $token_secret = false)
+    {
+        if (!is_null($this->_client)) {
+            return $this->_client;
+        } else {
+            $this->_client = new Client($this->_baseUrl);
+            return $this->_client;
+        }
     }
 }

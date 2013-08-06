@@ -16,5 +16,5 @@ namespace Jira\Api\Authentication;
 
 interface AuthenticationInterface
 {
-    
+    public function getClient($token = false, $token_secret = false);
 }

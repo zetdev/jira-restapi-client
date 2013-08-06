@@ -14,29 +14,34 @@
 
 namespace Jira\Api\Authentication;
 
+use Guzzle\Http\Client;
+
 class Basic implements AuthenticationInterface
 {
-    private $_user_id;
-    private $_password;
+    protected $_baseUrl;
+    protected $_userId;
+    protected $_password;
+    protected $_client;
 
-    public function __construct($user_id, $password)
+    public function __construct($base_url, $user_id, $password)
     {
-        $this->_user_id  = $user_id;
+        $this->_baseUrl = $base_url;
+        $this->_userId  = $user_id;
         $this->_password = $password;
     }
 
-    public function getCredential()
+    public function getCredentials()
     {
-        return base64_encode($this->_user_id . ':' . $this->_password);
+        return array($this->_userId, $this->_password);
     }
 
-    public function getId()
+    public function getClient($token = false, $token_secret = false)
     {
-        return $this->_user_id;
-    }
-
-    public function getPassword()
-    {
-        return $this->_password;
+        if (!is_null($this->_client)) {
+            return $this->_client;
+        } else {
+            $this->_client = new Client($this->_baseUrl);
+            return $this->_client;
+        }
     }
 }

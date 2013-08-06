@@ -176,6 +176,7 @@ class OauthClient implements ClientInterface
                     $request = $this->client->get($url,
                             array('Content-type' => 'application/json'));
                 }
+            break;
         }
         
         if (isset($request)) {
