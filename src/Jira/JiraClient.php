@@ -14,6 +14,7 @@
 
 namespace Jira;
 
+use Jira\Api\Client\BaseClient;
 use Jira\Api\Client\OauthClient;
 
 class JiraClient
