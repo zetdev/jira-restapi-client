@@ -15,6 +15,7 @@
 namespace Jira\Api\Authentication;
 
 use Guzzle\Http\Client;
+use Guzzle\Plugin\CurlAuth\CurlAuthPlugin;
 
 class Basic implements AuthenticationInterface
 {
@@ -41,6 +42,8 @@ class Basic implements AuthenticationInterface
             return $this->_client;
         } else {
             $this->_client = new Client($this->_baseUrl);
+            $this->_client->addSubscriber(new CurlAuthPlugin($this->_userId, $this->_password));
+            
             return $this->_client;
         }
     }

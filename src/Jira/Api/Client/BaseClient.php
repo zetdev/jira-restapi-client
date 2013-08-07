@@ -21,8 +21,8 @@ use Jira\Exception\InvalidArgumentException;
 
 class BaseClient implements ClientInterface
 {
-    const METHOD_GET = 'get';
-    const METHOD_POST = 'post';
+    const METHOD_GET     = 'get';
+    const METHOD_POST    = 'post';
     const DATA_TYPE_JSON = 'json';
     
     protected $_auth;
@@ -87,7 +87,7 @@ class BaseClient implements ClientInterface
      */
     protected function sendRequest($url, $data=null, $method=null, $data_type=null)
     {
-        if (!($this->_client instanceof AuthenticationInterface)) {
+        if (empty($this->_client)) {
             $this->_client = $this->getClient();
         }
         
@@ -118,11 +118,6 @@ class BaseClient implements ClientInterface
         }
         
         if (isset($request)) {
-            if ($this->_client instanceof Basic) {
-                list($user_id, $password) = $this->_auth->getCredentials();
-                $request->setAuth($user_id, $password);
-            }
-            
             $response = $request->send();
             
             if ($response->getStatusCode() == 401)
